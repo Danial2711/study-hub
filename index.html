@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1115" />
+    <meta name="description" content="Interactive study platform: lessons, flashcards, quizzes, mock exams and visualizations." />
+    <title>Study Hub</title>
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <script>
+      (function () {
+        var t = 'auto';
+        try { t = JSON.parse(localStorage.getItem('studyhub.state')).settings.theme || 'auto'; } catch (e) {}
+        if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
