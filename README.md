@@ -5,6 +5,8 @@ interactive diagrams, spaced-repetition flashcards, practice quizzes, timed mock
 exercises with worked solutions, a printable formula sheet and progress tracking.
 Works offline (PWA) and syncs progress between devices with a sync code.
 
+**Live:** https://study-hub.infosec-muni-studyhub.workers.dev
+
 The first course is **IV111 Probability in Computer Science** (FI MUNI):
 13 lectures, 182 flashcards, 93 explained formulas, 113 quiz questions + 17 random question generators,
 91 exercises with worked solutions and 16 interactive visualizations
@@ -127,3 +129,14 @@ Progress lives in the browser's localStorage. Creating a **sync code** in Settin
 (without the code itself) to KV under that code; entering the same code on another device merges
 both states (newer record wins, per card/question/exercise). Anyone who knows the code can read and
 overwrite that progress — treat it like a password. Export/import JSON works without any server.
+
+## Built with Claude Code
+
+Developed with [Claude Code](https://claude.com/claude-code). The platform/course split, the content-integrity
+tests and the tested math library (`src/shared/math`) keep generated course content honest: every formula
+must render and every answer is checked.
+
+## License
+
+Code: [Apache-2.0](LICENSE). The IV111 course content is my own study material based on the FI MUNI course;
+it is not official course material.
