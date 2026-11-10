@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useCourse } from '../CourseContext';
 import { useCourseProgress } from '../state/store';
-import { courseCards, type CardRef } from '../quiz';
+import { courseCards, topicLabel, type CardRef } from '../quiz';
 import { describeInterval, isDue, isLearned, type Grade } from '../state/srs';
 import { reviewCard } from '../state/actions';
 import { Markdown } from '../components/Markdown';
@@ -62,7 +62,7 @@ export function Flashcards() {
           <optgroup label="By lecture">
             {course.topics.map((t) => (
               <option key={t.id} value={`t:${t.id}`}>
-                L{t.lecture}: {t.title}
+                {topicLabel(t)}: {t.title}
               </option>
             ))}
           </optgroup>

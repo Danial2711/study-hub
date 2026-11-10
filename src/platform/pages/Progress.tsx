@@ -1,6 +1,6 @@
 import { useCourse } from '../CourseContext';
 import { useCourseProgress } from '../state/store';
-import { courseCards, courseQuestions } from '../quiz';
+import { courseCards, courseQuestions, topicLabel } from '../quiz';
 import { isLearned } from '../state/srs';
 import { todayKey } from '../state/model';
 import { groupMastery } from './Dashboard';
@@ -120,7 +120,7 @@ export function Progress() {
               {topicRows.map((r) => (
                 <tr key={r.t.id}>
                   <td>
-                    L{r.t.lecture} {r.t.title}
+                    {topicLabel(r.t)} {r.t.title}
                   </td>
                   <td className="num">
                     {r.answered}/{r.t.quiz.length}

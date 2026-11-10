@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { useCourse } from '../CourseContext';
 import { useCourseProgress } from '../state/store';
-import { courseCards, courseQuestions } from '../quiz';
+import { courseCards, courseQuestions, topicLabel } from '../quiz';
 import { isDue, isLearned } from '../state/srs';
 import { Markdown } from '../components/Markdown';
 import { todayKey, type CourseProgress } from '../state/model';
@@ -109,7 +109,7 @@ export function Dashboard() {
               <div className="row small" style={{ marginTop: 6 }}>
                 {topics.map((t) => (
                   <Link key={t.id} to={`learn/${t.id}`} className="chip">
-                    L{t.lecture} {t.title}
+                    {topicLabel(t)} {t.title}
                   </Link>
                 ))}
               </div>

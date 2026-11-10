@@ -7,7 +7,8 @@ import { QuestionView } from '../components/QuestionView';
 import { Markdown } from '../components/Markdown';
 import { buildQuestionSet } from './Quiz';
 import { makeRng } from '../../shared/math/random';
-import type { Course, Exercise, QuizQuestion } from '../types';
+import type { Course, ExamPart, Exercise, QuizQuestion } from '../types';
+import { gradeFor, scoreAutoPart, selectBlueprint, type PartScore } from '../exam';
 import type { ExamRecord } from '../state/model';
 
 const WRITTEN_POINTS = 4;
@@ -23,7 +24,15 @@ interface ExamSession {
   usedSeconds?: number;
   writtenScores: Record<string, number>;
   rubricChecks: Record<string, boolean[]>;
+  /** Blueprint exams: part id of every auto question / written problem. */
+  autoPart?: string[];
+  writtenPart?: string[];
 }
+
+type AutoPart = Extract<ExamPart, { kind: 'auto' }>;
+const partById = (course: Course, id: string | undefined) => course.mockExam.blueprint?.find((p) => p.id === id);
+/** Points a written problem is worth in this session. */
+const writtenPoints = (course: Course, session: ExamSession, k: number) => partById(course, session.writtenPart?.[k])?.points ?? WRITTEN_POINTS;
 
 const storeKey = (courseId: string) => `studyhub.mock.${courseId}`;
 function loadSession(courseId: string): ExamSession | null {
@@ -45,6 +54,18 @@ function saveSession(courseId: string, s: ExamSession | null) {
 
 function createExam(course: Course, prog: ReturnType<typeof useCourseProgress>, minutes: number, includeAll: boolean): ExamSession {
   const rng = makeRng();
+  const bp = course.mockExam.blueprint;
+  if (bp?.length) {
+    const sel = selectBlueprint(
+      course,
+      bp,
+      rng,
+      (gid, part: AutoPart) =>
+        buildQuestionSet(course, prog, { groups: new Set([gid]), n: part.count, source: 'all', generated: true, seed: Math.floor(rng.next() * 2 ** 31), difficulty: part.difficulty, types: part.types }),
+      includeAll,
+    );
+    return { id: `exam-${Date.now()}`, startedAt: Date.now(), minutes, ...sel, responses: {}, phase: 'exam', writtenScores: {}, rubricChecks: {} };
+  }
   const groups = includeAll ? course.examGroups : examinableGroups(course);
   const auto: QuizQuestion[] = [];
   const written: string[] = [];
@@ -96,12 +117,31 @@ export function MockExam() {
       <div className="card">
         {course.mockExam.instructions && <Markdown>{course.mockExam.instructions}</Markdown>}
         <ul className="small">
+          {course.mockExam.blueprint?.length ? (
+            <>
+              {course.mockExam.blueprint.map((p) => (
+                <li key={p.id}>
+                  <b>{p.title}:</b>{' '}
+                  {p.kind === 'auto'
+                    ? `${p.count} auto-graded question${p.count > 1 ? 's' : ''}, ${fmt1(p.points)} points each${p.penalty ? `, −${fmt1(p.penalty)} for a wrong answer (blank = 0)` : ''}.`
+                    : `${p.count > 1 ? `${p.count} written problems, ${fmt1(p.points)} points each` : `one written problem, ${fmt1(p.points)} points`}, self-graded with a checklist.`}
+                </li>
+              ))}
+              <li>
+                Maximum {fmt1(course.mockExam.blueprint.reduce((s, p) => s + p.count * p.points, 0))} points
+                {course.mockExam.gradeScale && <> · grades: {course.mockExam.gradeScale.map((g) => `${g.label} ≥ ${Math.round(g.minPercent * 10) / 10}%`).join(', ')}</>}.
+              </li>
+            </>
+          ) : (
+            <>
           <li>
             <b>Part A:</b> {groups.length * course.mockExam.autoPerGroup} auto-graded questions ({course.mockExam.autoPerGroup} per exam topic). No feedback until you submit.
           </li>
           <li>
             <b>Part B:</b> {groups.length * course.mockExam.writtenPerGroup} written problems ({WRITTEN_POINTS} points each). Solve them on paper; after submitting you reveal the worked solutions and grade yourself with a checklist.
           </li>
+            </>
+          )}
           <li>The exam is saved in this browser, so you can reload the page without losing it.</li>
         </ul>
         <div className="row" style={{ marginTop: 10 }}>
@@ -154,6 +194,7 @@ export function ExamHistory({ course, history }: { course: Course; history: Exam
                 {g.label}
               </th>
             ))}
+            {history.some((h) => h.grade) && <th className="num">grade</th>}
             <th className="num">time</th>
           </tr>
         </thead>
@@ -181,6 +222,7 @@ export function ExamHistory({ course, history }: { course: Course; history: Exam
                     </td>
                   );
                 })}
+                {history.some((x) => x.grade) && <td className="num">{h.grade ?? '—'}</td>}
                 <td className="num">{Math.round(h.usedSeconds / 60)} min</td>
               </tr>
             );
@@ -270,9 +312,23 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
                     A{idx + 1} / {session.auto.length}
                   </span>
                   <span className="chip accent">{groupById(course, q.examGroup ?? '')?.label}</span>
+                  {partById(course, session.autoPart?.[idx]) && <span className="chip">{partById(course, session.autoPart?.[idx])!.title}</span>}
                 </>
               }
             />
+            {session.autoPart && session.responses[idx] !== undefined && (
+              <button
+                className="btn ghost sm"
+                style={{ marginTop: 8 }}
+                onClick={() => {
+                  const r = { ...session.responses };
+                  delete r[idx];
+                  setSession({ ...session, responses: r });
+                }}
+              >
+                Clear answer (leave blank, no penalty)
+              </button>
+            )}
             <div className="row between" style={{ marginTop: 12 }}>
               <button className="btn" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>
                 ← Previous
@@ -298,7 +354,7 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
                   <span className="chip">B{k + 1}</span>
                   <span className="chip accent">{groupById(course, e.examGroup)?.label}</span>
                   <b>{e.title}</b>
-                  <span className="small faint">{WRITTEN_POINTS} points</span>
+                  <span className="small faint">{fmt1(writtenPoints(course, session, k))} points</span>
                 </div>
                 <Markdown>{e.prompt}</Markdown>
               </div>
@@ -310,31 +366,49 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
   }
 
   // ---------------- grading / done
-  const autoScore = session.auto.filter((q, i) => grade(q, session.responses[i])).length;
+  const bp = session.autoPart ? course.mockExam.blueprint : undefined;
+  const autoPts = (i: number) => (partById(course, session.autoPart?.[i]) as AutoPart | undefined)?.points ?? 1;
+  const wPts = new Map(session.written.map((id, k) => [id, writtenPoints(course, session, k)]));
+  const parts: PartScore[] = [];
+  for (const p of bp ?? []) {
+    if (p.kind === 'auto') {
+      parts.push(scoreAutoPart(p, session.auto.flatMap((q, i) => (session.autoPart![i] === p.id ? [{ q, r: session.responses[i] }] : []))));
+    } else {
+      const ids = session.written.filter((_, k) => session.writtenPart?.[k] === p.id);
+      parts.push({ id: p.id, title: p.title, score: ids.reduce((s, id) => s + (session.writtenScores[id] ?? 0), 0), max: ids.length * p.points });
+    }
+  }
+  const autoParts = parts.filter((p) => partById(course, p.id)?.kind === 'auto');
+  const autoScore = bp ? autoParts.reduce((s, p) => s + p.score, 0) : session.auto.filter((q, i) => grade(q, session.responses[i])).length;
+  const autoMax = bp ? autoParts.reduce((s, p) => s + p.max, 0) : session.auto.length;
   const writtenScore = written.reduce((s, e) => s + (session.writtenScores[e.id] ?? 0), 0);
+  const writtenMax = written.reduce((s, e) => s + (wPts.get(e.id) ?? WRITTEN_POINTS), 0);
   const byGroup: Record<string, { score: number; max: number }> = {};
   session.auto.forEach((q, i) => {
     const g = q.examGroup ?? '?';
     byGroup[g] ??= { score: 0, max: 0 };
-    byGroup[g].max += 1;
-    if (grade(q, session.responses[i])) byGroup[g].score += 1;
+    byGroup[g].max += autoPts(i);
+    if (grade(q, session.responses[i])) byGroup[g].score += autoPts(i);
   });
   written.forEach((e) => {
     byGroup[e.examGroup] ??= { score: 0, max: 0 };
-    byGroup[e.examGroup].max += WRITTEN_POINTS;
+    byGroup[e.examGroup].max += wPts.get(e.id) ?? WRITTEN_POINTS;
     byGroup[e.examGroup].score += session.writtenScores[e.id] ?? 0;
   });
   const total = autoScore + writtenScore;
-  const max = session.auto.length + written.length * WRITTEN_POINTS;
+  const max = autoMax + writtenMax;
+  const pct = (100 * total) / Math.max(1, max);
+  const gradeLabel = bp ? gradeFor(course.mockExam.gradeScale, pct) : undefined;
   const finish = () => {
     saveExam(course.id, {
       id: session.id,
       at: session.startedAt,
       minutes: session.minutes,
       usedSeconds: session.usedSeconds ?? 0,
-      auto: { score: autoScore, max: session.auto.length },
-      written: { score: writtenScore, max: written.length * WRITTEN_POINTS },
+      auto: { score: autoScore, max: autoMax },
+      written: { score: writtenScore, max: writtenMax },
       byGroup,
+      ...(bp ? { parts: Object.fromEntries(parts.map((p) => [p.id, { score: p.score, max: p.max }])), grade: gradeLabel } : {}),
       updatedAt: Date.now(),
     });
     setSession({ ...session, phase: 'done' });
@@ -350,7 +424,8 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
         <div>
           <h1>{session.phase === 'done' ? 'Exam report' : 'Grade your exam'}</h1>
           <p className="page-sub">
-            Part A: {autoScore}/{session.auto.length} · Part B: {fmt1(writtenScore)}/{written.length * WRITTEN_POINTS} · total {Math.round((100 * total) / Math.max(1, max))}% · time used {Math.round((session.usedSeconds ?? 0) / 60)} min
+            {bp ? `Total ${fmt1(total)}/${fmt1(max)} points` : `Part A: ${autoScore}/${session.auto.length} · Part B: ${fmt1(writtenScore)}/${writtenMax}`} · {Math.round(pct)}%
+            {gradeLabel && <> · estimated grade <b>{gradeLabel}</b></>} · time used {Math.round((session.usedSeconds ?? 0) / 60)} min
           </p>
         </div>
         <div className="row">
@@ -365,6 +440,45 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
           )}
         </div>
       </div>
+      {parts.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="scroll-x">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {parts.map((p) => (
+                    <th key={p.id} className="num">
+                      {p.title}
+                    </th>
+                  ))}
+                  <th className="num">total</th>
+                  {gradeLabel && <th className="num">grade</th>}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {parts.map((p) => (
+                    <td key={p.id} className="num">
+                      {fmt1(p.score)}/{fmt1(p.max)}
+                    </td>
+                  ))}
+                  <td className="num">
+                    <b>
+                      {fmt1(total)}/{fmt1(max)}
+                    </b>
+                  </td>
+                  {gradeLabel && (
+                    <td className="num">
+                      <b>{gradeLabel}</b>
+                    </td>
+                  )}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {session.phase === 'grading' && written.length > 0 && <div className="small muted" style={{ marginTop: 6 }}>Written parts count once you tick the self-grading checklists below.</div>}
+        </div>
+      )}
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
         {Object.entries(byGroup).map(([g, s]) => (
           <div key={g} className="card tight">
@@ -412,7 +526,7 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
               setSession({
                 ...session,
                 rubricChecks: { ...session.rubricChecks, [e.id]: c },
-                writtenScores: { ...session.writtenScores, [e.id]: (WRITTEN_POINTS * c.filter(Boolean).length) / rubric.length },
+                writtenScores: { ...session.writtenScores, [e.id]: ((wPts.get(e.id) ?? WRITTEN_POINTS) * c.filter(Boolean).length) / rubric.length },
               });
             return (
               <div key={e.id} className="card">
@@ -421,7 +535,7 @@ function ExamRun({ session, setSession }: { session: ExamSession; setSession: (s
                   <b>{e.title}</b>
                   {e.ref && <span className="small faint">{e.ref}</span>}
                   <span className="chip accent" style={{ marginLeft: 'auto' }}>
-                    {fmt1(session.writtenScores[e.id] ?? 0)} / {WRITTEN_POINTS}
+                    {fmt1(session.writtenScores[e.id] ?? 0)} / {fmt1(wPts.get(e.id) ?? WRITTEN_POINTS)}
                   </span>
                 </div>
                 <Markdown>{e.prompt}</Markdown>

@@ -16,6 +16,14 @@ export const COURSES: CourseManifest[] = [
     color: '#4f5bd5',
     load: () => import('../courses/iv111'),
   },
+  {
+    id: 'ia174',
+    code: 'IA174',
+    title: 'Fundaments of Cryptography',
+    description: 'Perfect and semantic security, stream and block ciphers, modes, hashes, MACs, authenticated encryption, RSA, discrete log, ECC, signatures, zero knowledge.',
+    color: '#0f8a6a',
+    load: () => import('../courses/ia174'),
+  },
 ];
 
 export const findCourse = (id: string) => COURSES.find((c) => c.id === id);

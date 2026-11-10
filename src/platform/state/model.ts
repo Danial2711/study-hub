@@ -48,6 +48,10 @@ export interface ExamRecord {
   auto: { score: number; max: number };
   written: { score: number; max: number };
   byGroup: Record<string, { score: number; max: number }>;
+  /** Blueprint exams: score per part. */
+  parts?: Record<string, { score: number; max: number }>;
+  /** Estimated grade from the course's grade scale. */
+  grade?: string;
   updatedAt: number;
 }
 

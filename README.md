@@ -7,16 +7,26 @@ Works offline (PWA) and syncs progress between devices with a sync code.
 
 **Live:** https://study-hub.infosec-muni-studyhub.workers.dev
 
-The first course is **IV111 Probability in Computer Science** (FI MUNI):
-13 lectures, 182 flashcards, 93 explained formulas, 113 quiz questions + 17 random question generators,
-91 exercises with worked solutions and 16 interactive visualizations
-(Venn diagrams, Bayes trees, distributions, tail bounds, LLN/CLT simulations,
-Markov-chain explorer, MDP value/policy iteration, entropy & mutual information,
-Huffman builder, Kraft checker, channel capacity, CTMC queues).
+Courses (both FI MUNI):
 
-> The exercises are **original problems** written in the style of the official tutorial
-> sheet and point to the corresponding official problem (`cf. Tutorial 2.1`). The official
-> sheet asks not to be redistributed, so none of its text is included here.
+- **IV111 Probability in Computer Science** — 13 lectures, 182 flashcards, 93 explained formulas,
+  113 quiz questions + 17 random question generators, 91 exercises with worked solutions and 16 interactive
+  visualizations (Venn diagrams, Bayes trees, distributions, tail bounds, LLN/CLT simulations,
+  Markov-chain explorer, MDP value/policy iteration, entropy & mutual information, Huffman builder,
+  Kraft checker, channel capacity, CTMC queues).
+- **IA174 Fundaments of Cryptography** — 13 lessons tagged *must-know / understand / context*
+  following the official exam guide, 190 flashcards, 56 explained formulas, 119 multiple-choice questions
+  + 23 generators, 61 exercises in the four exam question types (describe, find the flaw, HW-style,
+  security proof) and 19 interactive labs: perfect-secrecy checker, attack-game simulator
+  (SS/PRG/PRP/CPA/CCA/forgery games), one-time & two-time pad, ChaCha and AES round by round, GF(2⁸),
+  ECB/CBC/CTR on text and images, birthday attack and Floyd's ρ, Merkle–Damgård and sponge, Merkle trees, HMAC/CBC-MAC/CMAC/polynomial MAC, EtM vs MtE, groups, RSA attacks,
+  Diffie–Hellman with MITM, baby-step giant-step, elliptic curves over ℝ and 𝔽ₚ,
+  Schnorr nonce reuse, zero-knowledge identification. The mock exam reproduces the real exam
+  structure (penalised MCQs + four open questions, 120 points, grade estimate).
+
+> All exercises are **original problems** written in the style of the official tutorials/worksheets
+> and point to related official material (`cf. Tutorial 2.1`, `cf. Worksheet 3`). No text from the
+> official sheets, slides, homework assignments or their solutions is included.
 
 ## Quick start
 
@@ -38,10 +48,10 @@ Requires Node ≥ 20.
 | **Learn** | one page per lecture: definitions, theorems, proof ideas, worked examples, formula cards ("Explain" shows symbols, intuition, conditions, pitfalls), embedded visualizations, mini-quiz |
 | **Flashcards** | SM-2-style spaced repetition (Again/Hard/Good/Easy, keys 1–4, Space flips), cram mode, browse/search |
 | **Practice quiz** | by exam question or lecture; filters: all / my mistakes / unseen / weak; randomly generated problems |
-| **Mock exam** | timed; Part A auto-graded, Part B written problems self-graded with a rubric; per-topic report and history |
-| **Exercises** | filter by tutorial / exam question / status; hints, worked solutions, solved/review flags |
+| **Mock exam** | timed; auto-graded part and written problems self-graded with a rubric; per-topic report and history. Courses can define the exact exam structure (parts, points, penalties, grade scale) |
+| **Exercises** | filter by tutorial or topic / exam question / question type / status; hints, worked solutions, solved/review flags |
 | **Formula sheet** | every formula, searchable, printable |
-| **Playground** | all visualizations with free parameters |
+| **Playground** | the course's visualizations with free parameters (other courses' ones one click away) |
 | **Progress** | accuracy per lecture, mastery per exam question, activity heat-map, exam history |
 | **Settings** | theme, sync code, JSON export/import, reset per course |
 
@@ -57,10 +67,12 @@ src/
     state/             localStorage store, merge logic, sync client, spaced repetition
   shared/
     math/              tested numerics: distributions, bounds, Markov chains, MDPs, entropy, codes, channels
-    viz/               reusable visualizations (+ registry)
+      crypto/          AES, ChaCha20, SHA-256, GF(2⁸), toy Merkle–Damgård hash, number theory, groups, elliptic curves
+    viz/               reusable visualizations (+ registry); crypto/ holds the cryptography labs
   courses/
     _template/         copy this to start a new course
     iv111/             topics/ (one file per lecture), exercises/, generators.ts, viz/ (course-specific)
+    ia174/             topics/, exercises/ (by exam question type), generators.ts
 worker/                Cloudflare Worker: static assets + KV-backed sync API
 tests/                 math, state merge, quiz parsing, content integrity
 ```
@@ -74,13 +86,19 @@ tests/                 math, state merge, quiz parsing, content integrity
    LaTeX (`$…$`, `$$…$$`). Use `String.raw` (aliased as `md`) so backslashes need no escaping.
 4. Add flashcards, quiz questions (`mcq`, `multi`, `truefalse`, `numeric`), exercises
    (with `rubric` for mock-exam self-grading) and optionally `generators`.
+   Optional extras: `importance: 'must' | 'understand' | 'context'` on sections (shown as badges),
+   `tag` on topics (label instead of `L<n>`), `category` on exercises with `exerciseCategories` on the
+   course, and `exerciseUnits: 'topic'` to group exercises by topic instead of tutorial.
 5. Embed any shared visualization by id (`viz: [{ id: 'markovChain', props: { preset: 'weather' } }]`);
    course-specific ones go into the course's `viz` registry.
-6. Register it in `src/platform/registry.ts`:
+6. Configure the mock exam: either `autoPerGroup`/`writtenPerGroup`, or an exact `blueprint` of parts
+   (auto-graded parts with `points`, `penalty`, `difficulty`, `types`; written parts with `points` and a
+   `category`) plus an optional `gradeScale`. See `src/courses/ia174/index.ts`.
+7. Register it in `src/platform/registry.ts`:
    ```ts
    { id: 'xyz', code: 'XYZ123', title: '…', description: '…', color: '#0b8', load: () => import('../courses/xyz') }
    ```
-7. Run `npm test`. The content test validates **every** registered course: all LaTeX must
+8. Run `npm test`. The content test validates **every** registered course: all LaTeX must
    render, ids must be unique, answers must be valid and every examinable group needs
    questions and exercises.
 
@@ -138,5 +156,5 @@ must render and every answer is checked.
 
 ## License
 
-Code: [Apache-2.0](LICENSE). The IV111 course content is my own study material based on the FI MUNI course;
-it is not official course material.
+Code: [Apache-2.0](LICENSE). The IV111 and IA174 course content is my own study material based on the
+FI MUNI courses; it is not official course material.

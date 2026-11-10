@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useCourse } from '../CourseContext';
 import { useCourseProgress } from '../state/store';
 import { setExerciseStatus } from '../state/actions';
-import { groupById } from '../quiz';
+import { groupById, topicLabel } from '../quiz';
 import { Markdown } from '../components/Markdown';
 import type { Exercise } from '../types';
 
@@ -19,11 +19,18 @@ export function Exercises() {
   const [params, setParams] = useSearchParams();
   const tutorial = params.get('tutorial');
   const [group, setGroup] = useState('all');
+  const [category, setCategory] = useState(params.get('category') ?? 'all');
+  const byTopic = course.exerciseUnits === 'topic';
+  const unitLabel = (t: number) => {
+    const topic = byTopic ? course.topics.find((x) => x.lecture === t) : undefined;
+    return topic ? `${topicLabel(topic)} ${topic.title}` : `Tutorial ${t}`;
+  };
   const [status, setStatus] = useState<'all' | 'todo' | 'solved' | 'review'>('all');
   const tutorials = [...new Set(course.exercises.map((e) => e.tutorial).filter((x): x is number => x !== undefined))].sort((a, b) => a - b);
   const list = course.exercises.filter((e) => {
     if (tutorial && String(e.tutorial) !== tutorial) return false;
     if (group !== 'all' && e.examGroup !== group) return false;
+    if (category !== 'all' && e.category !== category) return false;
     const st = prog.exercises[e.id]?.status ?? 'none';
     if (status === 'todo' && st === 'solved') return false;
     if (status === 'solved' && st !== 'solved') return false;
@@ -51,10 +58,10 @@ export function Exercises() {
             setParams(p, { replace: true });
           }}
         >
-          <option value="">All tutorials</option>
+          <option value="">{byTopic ? 'All topics' : 'All tutorials'}</option>
           {tutorials.map((t) => (
             <option key={t} value={t}>
-              Tutorial {t}
+              {unitLabel(t)}
             </option>
           ))}
         </select>
@@ -66,6 +73,16 @@ export function Exercises() {
             </option>
           ))}
         </select>
+        {course.exerciseCategories && (
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="all">All question types</option>
+            {course.exerciseCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        )}
         <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
           <option value="all">Any status</option>
           <option value="todo">Not solved</option>
@@ -91,6 +108,7 @@ function ExerciseCard({ e }: { e: Exercise }) {
   const [hints, setHints] = useState(0);
   const [sol, setSol] = useState(false);
   const g = groupById(course, e.examGroup);
+  const cat = course.exerciseCategories?.find((c) => c.id === e.category);
   return (
     <div className="card" id={`ex-${e.id}`}>
       <div className="row between" style={{ marginBottom: 6 }}>
@@ -99,6 +117,7 @@ function ExerciseCard({ e }: { e: Exercise }) {
           <b>{e.title}</b>
         </div>
         <div className="row" style={{ gap: 6 }}>
+          {cat && <span className="chip" title={cat.description}>{cat.label}</span>}
           {g && <span className="chip accent">{g.label}</span>}
           <span className={`chip ${TIER[e.tier].cls}`}>{TIER[e.tier].label}</span>
           {st === 'solved' && <span className="chip good">solved</span>}
@@ -106,7 +125,7 @@ function ExerciseCard({ e }: { e: Exercise }) {
         </div>
       </div>
       <Markdown>{e.prompt}</Markdown>
-      {e.ref && <div className="small faint" style={{ marginTop: 4 }}>{e.ref} in the official tutorial sheet</div>}
+      {e.ref && <div className="small faint" style={{ marginTop: 4 }}>{e.ref}</div>}
       {e.hints?.slice(0, hints).map((h, i) => (
         <div key={i} className="callout small">
           <b>Hint {i + 1}.</b> <Markdown inline>{h}</Markdown>

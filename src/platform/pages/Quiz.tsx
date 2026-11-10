@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useCourse } from '../CourseContext';
 import { useCourseProgress } from '../state/store';
-import { courseQuestions, grade, groupById, topicById, type Response } from '../quiz';
+import { courseQuestions, grade, groupById, topicById, topicLabel, type Response } from '../quiz';
 import { recordAnswer } from '../state/actions';
 import { QuestionView } from '../components/QuestionView';
 import { Markdown } from '../components/Markdown';
@@ -12,9 +12,14 @@ import type { CourseProgress } from '../state/model';
 
 type Source = 'all' | 'mistakes' | 'unseen' | 'weak';
 
-export function buildQuestionSet(course: Course, prog: CourseProgress, opts: { groups: Set<string>; topics?: Set<string>; n: number; source: Source; generated: boolean; seed?: number }): QuizQuestion[] {
+export function buildQuestionSet(
+  course: Course,
+  prog: CourseProgress,
+  opts: { groups: Set<string>; topics?: Set<string>; n: number; source: Source; generated: boolean; seed?: number; difficulty?: number[]; types?: QuizQuestion['type'][] },
+): QuizQuestion[] {
   const rng = makeRng(opts.seed);
-  let bank = courseQuestions(course).filter((q) => (opts.topics?.size ? opts.topics.has(q.topicId!) : opts.groups.has(q.examGroup!)));
+  const fits = (q: QuizQuestion) => (!opts.difficulty || opts.difficulty.includes(q.difficulty ?? 1)) && (!opts.types || opts.types.includes(q.type));
+  let bank = courseQuestions(course).filter((q) => (opts.topics?.size ? opts.topics.has(q.topicId!) : opts.groups.has(q.examGroup!)) && fits(q));
   if (opts.source === 'mistakes') bank = bank.filter((q) => prog.mistakes[q.id]?.active);
   if (opts.source === 'unseen') bank = bank.filter((q) => !prog.questions[q.id]);
   if (opts.source === 'weak') bank = bank.filter((q) => { const s = prog.questions[q.id]; return !s || s.correct / s.seen < 0.7; });
@@ -26,7 +31,7 @@ export function buildQuestionSet(course: Course, prog: CourseProgress, opts: { g
       const g = rng.pick(gens);
       const q = g.generate(makeRng(Math.floor(rng.next() * 2 ** 31)));
       return { ...q, id: `gen:${g.id}:${Math.floor(rng.next() * 1e9)}`, examGroup: g.examGroup, topicId: g.topicId };
-    });
+    }).filter(fits);
     out = rng.shuffle([...out.slice(0, opts.n - genQs.length), ...genQs]);
   }
   return out.slice(0, opts.n);
@@ -76,7 +81,7 @@ export function Quiz() {
           <div className="row" style={{ gap: 6 }}>
             {[...topics].map((t) => (
               <span key={t} className="chip accent">
-                L{topicById(course, t)?.lecture} {topicById(course, t)?.title}
+                {topicLabel(topicById(course, t))} {topicById(course, t)?.title}
               </span>
             ))}
             <button className="btn sm ghost" onClick={() => setTopics(new Set())}>
@@ -89,7 +94,7 @@ export function Quiz() {
           <div className="collapse-body row" style={{ gap: 6 }}>
             {course.topics.map((t) => (
               <button key={t.id} className={`chip ${topics.has(t.id) ? 'on' : ''}`} onClick={() => setTopics(toggle(topics, t.id))}>
-                L{t.lecture} {t.title}
+                {topicLabel(t)} {t.title}
               </button>
             ))}
           </div>
@@ -206,7 +211,7 @@ function Runner({ questions, onExit, onRetry }: { questions: QuizQuestion[]; onE
               {i + 1} / {questions.length}
             </span>
             {g && <span className="chip accent">{g.label}</span>}
-            {t && <span className="chip">L{t.lecture} {t.title}</span>}
+            {t && <span className="chip">{topicLabel(t)} {t.title}</span>}
             {q.id.startsWith('gen:') && <span className="chip warn">generated</span>}
           </>
         }

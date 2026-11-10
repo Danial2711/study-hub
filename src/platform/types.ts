@@ -50,6 +50,9 @@ export interface WorkedExample {
 
 export type SectionKind = 'concept' | 'definition' | 'theorem' | 'example' | 'summary';
 
+/** How important a section is for the exam (e.g. taken from an official exam guide). */
+export type Importance = 'must' | 'understand' | 'context';
+
 export interface Section {
   id: string;
   title: string;
@@ -60,6 +63,8 @@ export interface Section {
   examples?: WorkedExample[];
   /** Short proof idea, collapsible. */
   proof?: Md;
+  /** Optional exam-importance badge. */
+  importance?: Importance;
 }
 
 export interface Flashcard {
@@ -121,8 +126,16 @@ export interface Exercise {
   prompt: Md;
   hints?: Md[];
   solution: Md;
-  /** Self-grading checklist used in mock exams (each item worth 1 point). */
+  /** Self-grading checklist used in mock exams (items are worth equal shares of the problem's points). */
   rubric?: string[];
+  /** Kind of exam question, see `Course.exerciseCategories` (e.g. "describe", "proof"). */
+  category?: string;
+}
+
+export interface ExerciseCategory {
+  id: string;
+  label: string;
+  description?: Md;
 }
 
 export interface QuestionGenerator {
@@ -137,6 +150,8 @@ export interface Topic {
   id: string;
   /** Lecture / chapter number, used for ordering. */
   lecture?: number;
+  /** Short label shown instead of `L<lecture>` (e.g. "L08", "G"). */
+  tag?: string;
   examGroup: string;
   title: string;
   summary: Md;
@@ -151,14 +166,49 @@ export interface ScheduleItem {
   kind: 'lecture' | 'tutorial' | 'exam' | 'other';
 }
 
+/** One part of a mock exam built from a blueprint. */
+export type ExamPart =
+  | {
+      kind: 'auto';
+      id: string;
+      title: string;
+      count: number;
+      /** Points for a correct answer. */
+      points: number;
+      /** Points subtracted for a wrong answer (a blank answer costs nothing). */
+      penalty?: number;
+      /** Allowed question difficulties (questions without a difficulty count as 1). */
+      difficulty?: number[];
+      types?: QuizQuestion['type'][];
+    }
+  | {
+      kind: 'written';
+      id: string;
+      title: string;
+      count: number;
+      points: number;
+      /** Only exercises of this category (see `Course.exerciseCategories`). */
+      category?: string;
+    };
+
+export interface GradeStep {
+  label: string;
+  /** Minimum percentage of the maximum score. */
+  minPercent: number;
+}
+
 export interface MockExamConfig {
   /** Selectable durations in minutes; first is the default. */
   minutes: number[];
-  /** Auto-graded questions per examinable group. */
+  /** Auto-graded questions per examinable group (ignored when `blueprint` is set). */
   autoPerGroup: number;
-  /** Written problems per examinable group. */
+  /** Written problems per examinable group (ignored when `blueprint` is set). */
   writtenPerGroup: number;
   instructions?: Md;
+  /** Exact exam structure; questions are drawn round-robin across the examinable groups. */
+  blueprint?: ExamPart[];
+  /** Grade boundaries, best first. */
+  gradeScale?: GradeStep[];
 }
 
 export type VizComponent = ComponentType<Record<string, unknown>>;
@@ -181,6 +231,10 @@ export interface Course {
   mockExam: MockExamConfig;
   /** Free-form notes about the exam shown on the dashboard. */
   examInfo?: Md;
+  /** Categories of exercises (used for filtering and mock-exam blueprints). */
+  exerciseCategories?: ExerciseCategory[];
+  /** Name of the official material exercises are grouped by ("Tutorial" by default). Use "topic" to group them by topic. */
+  exerciseUnits?: 'tutorial' | 'topic';
 }
 
 /** Lightweight entry in the course registry; the full course is lazy-loaded. */

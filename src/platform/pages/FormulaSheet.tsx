@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useCourse } from '../CourseContext';
-import { courseFormulas } from '../quiz';
+import { courseFormulas, topicLabel } from '../quiz';
 import { FormulaCard } from '../components/FormulaCard';
 
 export function FormulaSheet() {
@@ -47,7 +47,7 @@ export function FormulaSheet() {
         <div key={t.id}>
           <h2>
             <Link to={`/c/${course.id}/learn/${t.id}`} style={{ color: 'inherit' }}>
-              L{t.lecture} · {t.title}
+              {topicLabel(t)} · {t.title}
             </Link>
           </h2>
           <div className="grid cols-2">

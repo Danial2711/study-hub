@@ -171,3 +171,8 @@ export const courseFormulas = (course: Course) => build(course).formulas;
 export const topicById = (course: Course, id: string): Topic | undefined => course.topics.find((t) => t.id === id);
 export const groupById = (course: Course, id: string) => course.examGroups.find((g) => g.id === id);
 export const examinableGroups = (course: Course) => course.examGroups.filter((g) => g.examinable !== false);
+
+/** Short topic label, e.g. "L3" or a course-defined tag such as "G". */
+export const topicLabel = (t: Topic | undefined): string => (t ? (t.tag ?? `L${t.lecture ?? ''}`) : '');
+/** Longer kicker, e.g. "Lecture 3". */
+export const topicKicker = (t: Topic | undefined): string => (t ? (t.tag ?? `Lecture ${t.lecture ?? ''}`) : '');

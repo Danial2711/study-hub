@@ -48,6 +48,8 @@ function checkQuestion(where: string, q: QuizQuestion, errors: string[]) {
     q.options.forEach((o, i) => checkTex(`${where}.opt${i}`, o, errors));
     const ans = q.type === 'mcq' ? [q.answer] : q.answer;
     if (!ans.length || ans.some((a) => !Number.isInteger(a) || a < 0 || a >= q.options.length)) errors.push(`${where}: invalid answer index`);
+    if (new Set(q.options).size !== q.options.length) errors.push(`${where}: duplicate options`);
+    if (q.options.length < 2) errors.push(`${where}: fewer than 2 options`);
   }
   if (q.type === 'numeric' && !Number.isFinite(q.answer)) errors.push(`${where}: non-finite numeric answer`);
 }
@@ -105,7 +107,7 @@ function validateCourse(course: Course): string[] {
   }
   for (const g of course.generators ?? []) {
     if (!groups.has(g.examGroup)) errors.push(`generator ${g.id}: unknown group`);
-    for (let seed = 1; seed <= 25; seed++) checkQuestion(`gen ${g.id}#${seed}`, g.generate(makeRng(seed)), errors);
+    for (let seed = 1; seed <= 200; seed++) checkQuestion(`gen ${g.id}#${seed}`, g.generate(makeRng(seed)), errors);
   }
   return errors;
 }

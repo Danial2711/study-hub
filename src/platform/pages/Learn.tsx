@@ -6,7 +6,7 @@ import { Markdown } from '../components/Markdown';
 import { FormulaCard } from '../components/FormulaCard';
 import { VizHost } from '../components/VizHost';
 import { QuestionView } from '../components/QuestionView';
-import { groupById, grade, type Response } from '../quiz';
+import { groupById, grade, topicKicker, topicLabel, type Response } from '../quiz';
 import { markVisited, recordAnswer } from '../state/actions';
 import type { QuizQuestion, Section, Topic } from '../types';
 
@@ -38,7 +38,7 @@ export function Learn() {
                   return (
                     <Link key={t.id} to={`/c/${course.id}/learn/${t.id}`} className="card" style={{ color: 'inherit' }}>
                       <div className="row between">
-                        <span className="faint small mono">Lecture {t.lecture}</span>
+                        <span className="faint small mono">{topicKicker(t)}</span>
                         {prog.visited[t.id] && <span className="chip good">visited</span>}
                       </div>
                       <h3 style={{ margin: '4px 0 6px' }}>{t.title}</h3>
@@ -59,12 +59,27 @@ export function Learn() {
   );
 }
 
+const IMPORTANCE: Record<string, { label: string; hint: string }> = {
+  must: { label: 'Must-know', hint: 'Essential for the exam: know it exactly and be able to use it.' },
+  understand: { label: 'Understand', hint: 'Understand the idea; exact details need not be memorised.' },
+  context: { label: 'Context', hint: 'Background, not expected to be tested directly.' },
+};
+
 const KIND_LABEL: Record<string, string> = { concept: 'Concept', definition: 'Definition', theorem: 'Theorem', example: 'Example', summary: 'Summary' };
 
 function SectionView({ s }: { s: Section }) {
   return (
     <section id={s.id} className={`card section ${s.kind ?? ''}`}>
-      {s.kind && <div className="section-kind">{KIND_LABEL[s.kind]}</div>}
+      {(s.kind || s.importance) && (
+        <div className="row" style={{ gap: 8 }}>
+          {s.kind && <div className="section-kind">{KIND_LABEL[s.kind]}</div>}
+          {s.importance && (
+            <span className={`chip importance ${s.importance}`} title={IMPORTANCE[s.importance].hint}>
+              {IMPORTANCE[s.importance].label}
+            </span>
+          )}
+        </div>
+      )}
       <h2 style={{ marginTop: 4 }}>{s.title}</h2>
       <Markdown>{s.body}</Markdown>
       {s.formulas?.map((f) => <FormulaCard key={f.id} f={f} />)}
@@ -151,7 +166,7 @@ export function TopicPage() {
         <div className="row small" style={{ marginBottom: 4 }}>
           <Link to={`${base}/learn`}>← All lectures</Link>
           <span className="faint">/</span>
-          <span className="faint">Lecture {topic.lecture}</span>
+          <span className="faint">{topicKicker(topic)}</span>
           {g && <span className={`chip ${g.examinable === false ? 'warn' : 'accent'}`}>{g.examinable === false ? 'not examined' : `${g.label}: ${g.title}`}</span>}
         </div>
         <h1 style={{ marginTop: 6 }}>{topic.title}</h1>
@@ -182,14 +197,14 @@ export function TopicPage() {
         <div className="row between no-print" style={{ marginTop: 28 }}>
           {prev ? (
             <Link className="btn" to={`${base}/learn/${prev.id}`}>
-              ← L{prev.lecture} {prev.title}
+              ← {topicLabel(prev)} {prev.title}
             </Link>
           ) : (
             <span />
           )}
           {next && (
             <Link className="btn" to={`${base}/learn/${next.id}`}>
-              L{next.lecture} {next.title} →
+              {topicLabel(next)} {next.title} →
             </Link>
           )}
         </div>
